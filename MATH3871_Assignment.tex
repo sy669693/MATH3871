@@ -1,0 +1,330 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{physics, amsmath, amssymb}
+\usepackage{pdfpages}
+\usepackage[T1]{fontenc} % needed for the script font used in the e-signatures
+\usepackage{tikz}
+\usepackage{hyperref}
+
+%--- Front page details (edit these) --------------------------------
+\newcommand{\nameA}{Owen Ngeow}
+\newcommand{\zidA}{z0000000}       % TODO: Owen's zID
+\newcommand{\sigA}{Owen Ngeow}     % e-signature text
+\newcommand{\nameB}{Sze Yong Ng}
+\newcommand{\zidB}{z0000000}       % TODO: Sze Yong's zID
+\newcommand{\sigB}{Sze Yong Ng}
+% Typesets a name in a script font as an e-signature.
+\newcommand{\sig}[1]{{\fontfamily{pzc}\fontsize{17}{17}\selectfont #1}}
+% Front-page row positions (bp from top of page) for Name/zID/Signature #1 and #2.
+\newcommand{\rowA}{459}
+\newcommand{\rowB}{545}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathbb{V}\mathrm{ar}}
+
+% Question text is set in a small indented block; solutions follow in normal text.
+\newenvironment{question}{\begin{quote}\small}{\end{quote}}
+\newcommand{\solution}{\noindent\textbf{Solution.}\ }
+
+\title{MATH3871 Assignment 26T3}
+\author{Owen Ngeow \and Sze Yong Ng}
+\date{\today}
+
+\begin{document}
+
+% Mandatory front page: page 2 of the official assignment sheet, with our details overlaid.
+\includepdf[pages=2, pagecommand={%
+  \thispagestyle{empty}%
+  \begin{tikzpicture}[remember picture, overlay, every node/.style={font=\fontsize{12}{14}\selectfont}]
+    \node[anchor=base west] at ([xshift=114bp, yshift=-\rowA bp]current page.north west) {\nameA};
+    \node[anchor=base west] at ([xshift=293bp, yshift=-\rowA bp]current page.north west) {\zidA};
+    \node[anchor=base west, inner sep=0pt] at ([xshift=503bp, yshift=-\rowA bp]current page.north west) {\sig{\sigA}};
+    \node[anchor=base west] at ([xshift=114bp, yshift=-\rowB bp]current page.north west) {\nameB};
+    \node[anchor=base west] at ([xshift=293bp, yshift=-\rowB bp]current page.north west) {\zidB};
+    \node[anchor=base west, inner sep=0pt] at ([xshift=503bp, yshift=-\rowB bp]current page.north west) {\sig{\sigB}};
+  \end{tikzpicture}}]{2026-MATH3871-5960-Assignment.pdf}
+
+\maketitle
+
+%=====================================================================
+\section*{Exercise 1 [10 marks]}
+
+\begin{question}
+Let $x_1, \dots, x_n \in \mathbb{R}^d$ be $n$ iid $d$-dimensional vectors. Suppose that we wish to model $x_i \sim N_d(\mu, \Sigma)$ for $i = 1, \dots, n$ where $\mu \in \mathbb{R}^d$ is an unknown mean vector, and $\Sigma$ is a known positive semi-definite covariance matrix.
+\end{question}
+
+%---------------------------------------------------------------------
+\subsection*{(a) [3 marks]}
+
+\begin{question}
+Adopting the conjugate prior $\mu \sim N_d(\mu_0, \Sigma_0)$ and by completing the square, from the Week 3 tutorial we know that the resulting posterior distribution for $\mu | x_1, \dots, x_n$ is $N_d(\hat\mu, \hat\Sigma)$ where
+\[
+    \hat\mu = (\Sigma_0^{-1} + n\Sigma^{-1})^{-1} (\Sigma_0^{-1} \mu_0 + n\Sigma^{-1} \bar{x})
+\]
+where $\bar{x} = \frac1n \sum_i x_i$ is the sample mean vector, and
+\[
+    \hat\Sigma = (\Sigma_0^{-1} + n\Sigma^{-1})^{-1}.
+\]
+A friend uses this model to analyse their data, and gives you their $\hat\mu$ and $\hat\Sigma$. What values of $\mu_0$ and $\Sigma_0$ did they choose?
+\end{question}
+
+\solution
+Given the posterior variance $\hat\Sigma$, we rearrange the given expression to solve for $\Sigma_0$:
+\begin{align*}
+    \hat\Sigma &= (\Sigma_0^{-1} + n\Sigma^{-1})^{-1} \\
+    \hat\Sigma^{-1} &= \Sigma_0^{-1} + n\Sigma^{-1} \\
+    \Sigma_0^{-1} &= \hat\Sigma^{-1} - n\Sigma^{-1} \\
+    \Sigma_0 &= (\hat\Sigma^{-1} - n\Sigma^{-1})^{-1}.
+\end{align*}
+
+Similarly for $\hat\mu$ and $\mu_0$,
+\begin{align*}
+    \hat\mu &= (\Sigma_0^{-1} + n\Sigma^{-1})^{-1} (\Sigma_0^{-1} \mu_0 + n\Sigma^{-1} \bar{x}) \\
+    (\Sigma_0^{-1} + n\Sigma^{-1}) \hat\mu &= \Sigma_0^{-1} \mu_0 + n\Sigma^{-1} \bar{x} \\
+     \Sigma_0^{-1} \mu_0 &= (\Sigma_0^{-1} + n\Sigma^{-1}) \hat\mu - n\Sigma^{-1} \bar{x} \\
+     \mu_0 &= \Sigma_0 [(\Sigma_0^{-1} + n\Sigma^{-1}) \hat\mu - n\Sigma^{-1} \bar{x}].
+\end{align*}
+Substituting the previous result for $\Sigma_0$ gives
+\[
+    \mu_0 = (\hat\Sigma^{-1} - n\Sigma^{-1})^{-1} (\hat\Sigma^{-1} \hat\mu - n\Sigma^{-1} \bar{x}).
+\]
+
+%---------------------------------------------------------------------
+\subsection*{(b) [3 marks]}
+
+\begin{question}
+Under what circumstances can the prior and posterior means be equal? Under what circumstances can the prior and posterior variances be equal?
+\end{question}
+
+\solution
+Suppose the posterior mean is equal to the prior mean, i.e., $\hat\mu = \mu_0$.
+From part (a),
+\begin{align*}
+    \mu_0 &= (\Sigma_0^{-1} + n\Sigma^{-1})^{-1} (\Sigma_0^{-1} \mu_0 + n\Sigma^{-1} \bar{x}) \\
+     (\Sigma_0^{-1} + n\Sigma^{-1}) \mu_0 &= \Sigma_0^{-1} \mu_0 + n\Sigma^{-1} \bar{x} \\
+     n\Sigma^{-1} \mu_0 &= n\Sigma^{-1} \bar{x} \\
+    \bar{x} &= \mu_0.
+\end{align*}
+We see that this is possible when the sample mean is equal to the prior mean.
+
+Now suppose $\hat\Sigma = \Sigma_0$.
+Then
+\begin{align*}
+    \Sigma_0 &= (\Sigma_0^{-1} + n\Sigma^{-1})^{-1} \\
+    \Sigma_0^{-1} &= \Sigma_0^{-1} + n\Sigma^{-1} \\
+    \vb{0} &= n\Sigma^{-1},
+\end{align*}
+which is impossible.
+
+Therefore it is not possible for the prior variance to be equal to the posterior variance. This intuitively makes sense because as more samples are taken, the precision of our posterior distribution should be strictly increasing, and thus the posterior variance must be lower than the prior variance.
+
+%---------------------------------------------------------------------
+\subsection*{(c) [4 marks]}
+
+\begin{question}
+Derive Jeffreys' prior $\pi_J(\mu)$ for $\mu$.
+
+\emph{Hint:} If you need help with vector differentiation, you can find out about this on various places on the internet. One such place is \url{https://en.wikipedia.org/wiki/Matrix_calculus}.
+\end{question}
+
+\solution
+The model likelihood is given by
+\[
+    \pi(x_i|\mu) = \frac{1}{\sqrt{(2\pi)^d |\Sigma|}} \exp[-\frac12 (x_i - \mu)^T \Sigma^{-1} (x_i - \mu)]
+\]
+and the corresponding log-likelihood is
+\[
+    \log \pi(x_i|\mu) = -\frac12 \log[(2\pi)^d |\Sigma|] - \frac12 (x_i - \mu)^T \Sigma^{-1} (x_i - \mu).
+\]
+
+Taking the derivative,
+\[
+    \pdv{\mu} \log \pi(x_i|\mu) = \frac12 (\Sigma^{-1} + (\Sigma^{-1})^T) (x_i - \mu)
+\]
+by a standard matrix calculus identity.
+Since $\Sigma$ is a covariance matrix and hence symmetric, $\frac12 (\Sigma^{-1} + (\Sigma^{-1})^T) = \Sigma^{-1}$ and
+\[
+    \pdv{\mu} \log \pi(x_i|\mu) = \Sigma^{-1} (x_i - \mu).
+\]
+
+Differentiating again and taking the expectation then gives
+\[
+    \mathcal{I}(\mu) = \E\left[-\pdv[2]{\mu} \log \pi(x_i|\mu) \right] = \Sigma^{-1}.
+\]
+
+Finally, we can calculate Jeffrey's prior by
+\[
+    \pi_J(\mu) \propto \sqrt{|\mathcal{I}(\mu)|} = \frac{1}{\sqrt{|\Sigma|}},
+\]
+which is constant.
+
+%=====================================================================
+\section*{Exercise 2 [20 marks]}
+
+\begin{question}
+Archaeology provides a rich source of complex, non-standard problems, where if the prior is available, it needs careful elicitation. Here we look at a data study of the technique of corbelling, a method of roofing spaces (domes) with blocks of stone, widely used in prehistory.
+
+% [Dome pictures from the assignment sheet go here, e.g.]
+% \begin{center}\includegraphics[width=0.6\textwidth]{domes.png}\end{center}
+
+For many decades, archaeologists and historians have been examining the ability of prehistoric communities to develop sufficient skills to allow them to construct these domes, some of which have survived for over 4,000 years. These speculations have led to applied mathematical models being developed as an aid to understanding why the domes stand up and how they were constructed. They also help inform whether a particular manner of construction has passed from one community to another based on how similar the construction technique is.
+
+Consider the simplest of these models:
+\[
+    y_i = \alpha x_i^\beta,
+\]
+for $i = 1, \dots, n$, where $y$ denotes the radius of the dome at which measurements were taken, and $x$ is the depth from the apex of the dome (the highest point) to the point at which measurements were taken. It is easier to work with the log linear model
+\[
+    \ln y_i = \ln\alpha + \beta \ln x_i + \epsilon_i
+\]
+where $\epsilon_i \sim N(0, \sigma^2)$ are iid error terms.
+
+Below are 24 measurements from the late Minoan tholos dome at Stylos in Crete. You can find these in the file \texttt{stylos.csv}.
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l|cccccccccccc}
+    $x$ (depth)  & 0.04 & 0.24 & 0.44 & 0.64 & 0.84 & 1.04 & 1.24 & 1.44 & 1.64 & 1.84 & 2.04 & 2.24 \\
+    $y$ (radius) & 0.40 & 0.53 & 0.70 & 0.90 & 1.06 & 1.16 & 1.26 & 1.36 & 1.47 & 1.62 & 1.67 & 1.68 \\
+    \hline
+    $x$ (depth)  & 2.44 & 2.64 & 2.84 & 3.04 & 3.24 & 3.44 & 3.64 & 3.84 & 4.04 & 4.24 & 4.44 & 4.64 \\
+    $y$ (radius) & 1.77 & 1.82 & 1.89 & 1.96 & 2.00 & 2.05 & 2.10 & 2.10 & 2.14 & 2.13 & 2.15 & 2.14
+\end{tabular}
+
+Table 1: Measurements for the late Minoan tholos at Stylos.
+\end{center}
+
+For each of the following, provide your code (R or Python or \dots), relevant output, and discussion.
+Note: you may not use JAGS (or other similar programs), and need to write your own sampler.
+\end{question}
+
+%---------------------------------------------------------------------
+\subsection*{(a) [4 marks]}
+
+\begin{question}
+Specify and carefully justify a suitable joint prior distribution, $\pi(\theta)$, for $\theta = (\ln\alpha, \beta, \sigma^2)$. Hence write down the functional form of the posterior distribution.
+\end{question}
+
+\solution
+From the log linear model we see that $\ln y_i \sim N(\ln\alpha + \beta\ln x_i, \sigma^2)$.
+Thus, $y_i \sim \mathrm{LogNormal}(\ln\alpha + \beta\ln x_i, \sigma^2)$ with
+\[
+    \pi(y_i|\theta,x_i) = \frac{1}{y_i\sqrt{2\pi\sigma^2}} \exp(-\frac{1}{2\sigma^2} (\ln y_i - \ln\alpha - \beta\ln x_i)^2)
+\]
+where $\theta = (\ln\alpha, \beta, \sigma^2)$.
+As a result, the likelihood for $y$ is
+\[
+    \mathcal{L}(y|\theta,x) = \prod_i \frac{1}{y_i\sqrt{2\pi\sigma^2}} \exp(-\frac{1}{2\sigma^2} (\ln y_i - \ln\alpha - \beta\ln x_i)^2).
+\]
+
+In the model, $\ln\alpha$ represents the log-radius of the dome when the depth is 1 metre, $\beta$ controls the shape of the dome's curvature, and $\sigma^2$ is the variance of the log-radius. It is reasonable to assume that these three parameters are all independent to each other, since there is no strong reason to expect them to have any pairwise dependence.
+
+Based on the given dome pictures, we estimated $\ln\alpha$ quantity to be around 1. Since we have some prior knowledge about where $\alpha$ should lie, it is reasonable to use a normal distribution as a prior for $\ln{\alpha}$, with mean of $\ln 1 = 0$.
+We also estimated that a 95\% credible interval for $\alpha$ has a lower bound of $\alpha = 0.5$ based on the dimensions in the pictures and a reasonable minimum size for a room under the dome.
+By taking the logarithm we attain $[\pm\ln2]$ as a 95\% CI for $\ln\alpha$.
+The standard deviation is then given by $\sigma_\alpha = \ln 2/z_{0.975} \approx \sqrt{0.125}$.
+Thus the prior is $\ln\alpha \sim N(0, 0.125)$, with pdf
+\[
+    \pi(\ln\alpha) \propto \exp(-\frac{1}{2\sigma_\alpha^2} (\ln\alpha)^2).
+\]
+
+Since the dome is convex, its shape is consistent with $0 \leq \beta \leq 1$.
+The dome shape when $\beta$ is close to the endpoints is sharp and unphysical, so we give a higher prior weight to values around $\beta = 0.5$.
+Therefore, we use $\beta \sim \mathrm{Beta}(5,5)$ as a prior with $\pi(\beta) \propto \beta^4 (1-\beta)^4$.
+
+The parameter $\sigma^2$ represents the variance of the log-radius $\ln y_i$.
+Since we have a high degree of ignorance to this quantity, we use Jeffrey's prior to preserve this under monotonic transformations.
+
+\begin{align*}
+    \log\mathcal{L}(y|\theta,x) &= \sum_i \left( -\ln(y_i\sqrt{2\pi}) - \frac12\ln\sigma^2 - \frac{1}{2\sigma^2} (\ln y_i - \ln\alpha - \beta\ln x_i)^2 \right) \\
+    \pdv{\log\mathcal{L}(y|\theta,x)}{(\sigma^2)} &= \sum_i \left( -\frac{1}{2\sigma^2} + \frac{(\ln y_i - \ln\alpha - \beta\ln x_i)^2}{2(\sigma^2)^2} \right) \\
+    \pdv[2]{\log\mathcal{L}(y|\theta,x)}{(\sigma^2)} &= \sum_i \left( \frac{1}{2(\sigma^2)^2} - \frac{(\ln y_i - \ln\alpha - \beta\ln x_i)^2}{(\sigma^2)^3} \right)
+\end{align*}
+
+Since $\ln y_i \sim N(\ln\alpha + \beta\ln x_i, \sigma^2)$, we may observe that $\E[(\ln y_i - \ln\alpha - \beta\ln x_i)^2] = \Var(\ln y_i) = \sigma^2$.
+Hence
+\begin{align*}
+    \E \left[ -\pdv[2]{\log\mathcal{L}(y|\theta,x)}{(\sigma^2)} \right] &= \sum_i \frac{1}{2(\sigma^2)^2}. \\
+    \mathcal{I}(\sigma^2) &= \frac{n}{2(\sigma^2)^2}.
+\end{align*}
+Thus we obtain the improper Jeffrey's prior $\pi_J(\sigma^2) \propto \sqrt{|\mathcal{I}(\sigma^2)|} \propto 1/\sigma^2$.
+
+Since the parameters are independent, the joint prior is simply the product of the marginal priors:
+\begin{align*}
+    \pi(\theta) &= \pi(\ln\alpha) \pi(\beta) \pi(\sigma^2) \\
+    &\propto \exp(-\frac{1}{2\sigma_\alpha^2} (\ln\alpha)^2) \beta^ 4(1-\beta)^4 \frac{1}{\sigma^2}.
+\end{align*}
+
+The joint posterior distribution can be described by
+\begin{align*}
+    \pi(\theta|y,x) &\propto \mathcal{L}(y|\theta,x) \pi(\theta) \\
+    % &\propto \exp(-\frac{1}{2\sigma_\alpha^2} (\ln\alpha)^2) \beta^ 4(1-\beta)^4 \frac{1}{\sigma^2} \prod_i \frac{1}{y_i\sqrt{\sigma^2}} \exp(-\frac{1}{2\sigma^2} (\ln y_i - \ln\alpha - \beta\ln x_i)^2) \\
+    &\propto \frac{\beta^ 4(1-\beta)^4}{(\sigma^2)^{1+n/2}} \exp(-\frac{1}{2\sigma_\alpha^2} (\ln\alpha)^2 - \frac{1}{2\sigma^2} \sum_i (\ln y_i - \ln\alpha - \beta\ln x_i)^2).
+\end{align*}
+
+%---------------------------------------------------------------------
+\subsection*{(b) [4 marks]}
+
+\begin{question}
+Using either i) rejection sampling, ii) importance sampling, or iii) Markov chain Monte Carlo, draw samples from the posterior distribution $\pi(\theta|x)$. (You may wish to write a function that inputs an observed data matrix, and returns posterior samples, which may help with later questions.) Depending on your choice of algorithm, demonstrate how you achieved good algorithm efficiency/performance via thoughtful choice of:
+\begin{itemize}
+    \item Rejection sampling: sampling distribution $g(\theta)$, and constant $K$ such that $\pi(\theta|x) \leq K g(\theta)$, $\forall\theta$,
+    \item Importance sampling: sampling distribution $g(\theta)$,
+    \item Markov chain Monte Carlo: Metropolis--Hastings proposal distribution $q(\theta_t, \theta')$.
+\end{itemize}
+\end{question}
+
+\solution
+% TODO
+
+%---------------------------------------------------------------------
+\subsection*{(c) [2 marks]}
+
+\begin{question}
+Produce a plot of each estimated univariate and bivariate posterior marginal distribution (6 plots). Comment on the dependence structure.
+\end{question}
+
+\solution
+% TODO
+
+%---------------------------------------------------------------------
+\subsection*{(d) [4 marks]}
+
+\begin{question}
+Estimate and plot the predictive distribution of a future radius measurement ($y_1^*$) for the first (observed) depth measurement of $x_1 = 0.04$, based on a posterior distribution that does not include this datapoint. I.e.\ for $i = 1$ estimate
+\[
+    \pi(y_i^* | x_{-i}, y_{-i}) \propto \int \pi(y_i^* | \theta) \, \pi(\theta | x_{-i}, y_{-i}) \, d\theta
+\]
+where $x = (x_1, \dots, x_n)$, and $x_{-i}$ is the vector $x$ but excluding the $i$-th element. Plot the observed $y_1 = 0.4$ on this predictive distribution. Construct a central 95\% credible interval for $y_1^*$ and add this to the plot. Is the observed datapoint $y_1$ in this interval? What is the motivation for using this leave-one-out posterior predictive distribution, rather than using the full posterior?
+\end{question}
+
+\solution
+% TODO
+
+%---------------------------------------------------------------------
+\subsection*{(e) [3 marks]}
+
+\begin{question}
+Using the same process as for part (d), produce a plot with $x_i$ on the $x$-axis, and a line denoting the central 95\% credible interval for $y_i^* | x_{-i}, y_{-i}$ for each $i = 1, \dots, 24$ on the $y$-axis. Superimpose the observed data $(x_i, y_i)$ in each case. Comment on the ability of this model to describe the observed data.
+\end{question}
+
+\solution
+% TODO
+
+%---------------------------------------------------------------------
+\subsection*{(f) [3 marks]}
+
+\begin{question}
+Repeat (e) but for the simplified model
+\begin{gather*}
+    y_i = \alpha x_i \\
+    \ln y_i = \ln\alpha + \ln x_i + \epsilon_i
+\end{gather*}
+obtained by fixing $\beta = 1$. Based solely on these goodness-of-fit plots and the posterior marginal for $\beta$ in part (c), discuss whether $\beta = 1$ is supported by the data.
+\end{question}
+
+\solution
+% TODO
+
+\end{document}
