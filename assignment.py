@@ -42,7 +42,8 @@ def beta_proposal_params(mode, var):
   k = roots[np.isreal(roots) & (roots.real > 0)].real[0]
   return 1 + mode*k, 1 + (1-mode)*k
 
-def sample_posterior_mh(data, proposal_dist='rw', size=1000, init=(0, 0.5, 0.01)):
+def sample_posterior_mh(data, proposal_dist='rw',
+  proposal_params=(0.03, 0.0004, 0.46), size=1000, init=(0, 0.5, 0.01)):
   sample = np.empty((size, 3))
   u = scipy.stats.uniform.rvs(size=size)
 
@@ -50,10 +51,17 @@ def sample_posterior_mh(data, proposal_dist='rw', size=1000, init=(0, 0.5, 0.01)
   sample[0,:] = init
 
   match proposal_dist:
+    case 'baseline':
+      q = lambda theta, _: 1
+      # Proposals with sigma^2 <= 0 have zero posterior density and are rejected,
+      # so no clipping is needed (clipping would make the walk asymmetric)
+      def sample_q(t):
+        return sample[t,:] + scipy.stats.norm.rvs(scale=[0.1, 0.1, 0.01], size=3)
     case 'rw':
-      ln_a_step = 0.03     # sd of the Gaussian walk on ln(alpha)
-      b_var = 0.0004       # variance of the Beta proposal for beta
-      log_var_step = 0.46  # sd of the Gaussian walk on ln(sigma^2)
+      # ln_a_step = 0.03     # sd of the Gaussian walk on ln(alpha)
+      # b_var = 0.0004       # variance of the Beta proposal for beta
+      # log_var_step = 0.46  # sd of the Gaussian walk on ln(sigma^2)
+      ln_a_step, b_var, log_var_step = proposal_params
 
       # Density of proposing theta from given. The ln(alpha) walk is symmetric,
       # so its term cancels in the acceptance ratio and is left out.
@@ -155,12 +163,35 @@ inits = [
   (0.4, 0.7, 0.02),
   (-0.1, 0.2, 0.02),
 ]
-# Indexed as [iteration, chain, parameter]
-samples = np.stack(
-  [sample_posterior_mh(data, size=2*n, init=init) for init in inits],
-  axis=1
-)
-samples.shape
+# Samplers to compare: name -> keyword arguments for sample_posterior_mh
+samplers = {
+  'Baseline Gaussian walk': dict(proposal_dist='baseline'),
+  'RW, default steps': dict(proposal_dist='rw', proposal_params=(0.03, 0.0004, 0.46)),
+  'RW, larger steps': dict(proposal_dist='rw', proposal_params=(0.045, 0.0009, 0.7)),
+}
+# One colour per sampler, in a fixed order
+sampler_colors = ['#2a78d6', '#eb6834', '#1baf7a']
+
+# Each indexed as [iteration, chain, parameter]
+samples = {
+  name: np.stack(
+    [sample_posterior_mh(data, size=2*n, init=init, **kwargs) for init in inits],
+    axis=1
+  )
+  for name, kwargs in samplers.items()
+}
+for name, chains in samples.items():
+  # A rejected proposal repeats the previous state
+  accept_rate = (chains[1:] != chains[:-1]).any(axis=2).mean()
+  print(f'{name}: acceptance rate {accept_rate:.2f}')
+
+# Thin the default RW chains, keeping every k-th draw. The default chain's integrated
+# autocorrelation time is roughly 11-15 iterations, so k = 10 leaves kept draws nearly uncorrelated.
+k = 10
+samples[f'RW, default steps, thinned (k={k})'] = samples['RW, default steps'][::k]
+# The thinned chains reuse the default RW colour, dashed
+sampler_colors.append(sampler_colors[1])
+sampler_styles = ['-', '-', '-', '--']
 
 #%%
 def gelman_rubin(chains):
@@ -176,21 +207,28 @@ def acf(x, max_lag):
   autocovariance = np.correlate(x, x, mode='full')[len(x) - 1:]
   return autocovariance[:max_lag + 1] / autocovariance[0]
 
-# R-hat as the chains grow, discarding the first half of the iterations at each point
+# R-hat as the chains grow, discarding the first half of the iterations at each point.
+# Iterations count every draw of the sampler, kept or not, so thinned chains line up.
 iterations = np.arange(100, 2*n + 1, 100)
-r_hat = np.array([gelman_rubin(samples[t // 2:t]) for t in iterations])
-print('Final R-hat (ln_a, b, var):', r_hat[-1].round(3))
+r_hat = {}
+for name, chains in samples.items():
+  thin = 2*n // len(chains)
+  r_hat[name] = np.array([gelman_rubin(chains[t // 2 // thin:t // thin]) for t in iterations])
+for name, values in r_hat.items():
+  print(f'{name}: final R-hat (ln_a, b, var) {values[-1].round(3)}')
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.5))
 for j, (ax, label) in enumerate(zip(axes, labels)):
-  ax.plot(iterations, r_hat[:, j], linewidth=2)
+  for (name, values), color, style in zip(r_hat.items(), sampler_colors, sampler_styles):
+    ax.plot(iterations, values[:, j], style, linewidth=2, color=color, label=name)
   ax.axhline(1.1, color='gray', linestyle='--', linewidth=1, label='1.1 threshold')
   ax.set_title(f'Gelman-Rubin $\\hat{{R}}$ of {label}')
   ax.set_xlabel('Iteration')
   ax.set_ylabel('$\\hat{R}$')
   ax.spines[['top', 'right']].set_visible(False)
-  ax.legend(frameon=False)
-plt.tight_layout()
+# One shared legend above the panels
+fig.legend(*axes[0].get_legend_handles_labels(), loc='upper center', ncol=3, frameon=False)
+plt.tight_layout(rect=(0, 0, 1, 0.84))
 plt.show()
 
 # Autocorrelation after burn-in, averaged over the chains
@@ -199,14 +237,20 @@ lags = np.arange(max_lag + 1)
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.5))
 for j, (ax, label) in enumerate(zip(axes, labels)):
-  mean_acf = np.mean([acf(samples[n:, chain, j], max_lag) for chain in range(m)], axis=0)
-  ax.vlines(lags, 0, mean_acf, linewidth=1.5)
+  for (name, chains), color, style in zip(samples.items(), sampler_colors, sampler_styles):
+    # Second half of each chain, so thinned chains lose the same burn-in
+    kept = chains[len(chains) // 2:]
+    mean_acf = np.mean([acf(kept[:, chain, j], max_lag) for chain in range(m)], axis=0)
+    # ax.plot(lags, mean_acf, style, linewidth=2, color=color, label=name)
+    ax.bar(lags, mean_acf, color=color, label=name)
   ax.axhline(0, color='gray', linewidth=1)
   ax.set_title(f'Autocorrelation of {label}')
-  ax.set_xlabel('Lag')
+  # Lags count kept draws, so one thinned lag spans k sampler iterations
+  ax.set_xlabel('Lag (kept draws)')
   ax.set_ylabel('ACF')
   ax.spines[['top', 'right']].set_visible(False)
-plt.tight_layout()
+fig.legend(*axes[0].get_legend_handles_labels(), loc='upper center', ncol=2, frameon=False)
+plt.tight_layout(rect=(0, 0, 1, 0.84))
 plt.show()
 
 #%%
