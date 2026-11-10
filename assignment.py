@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 #%%
+LINEWIDTH = 469.75502 / 72
+
+#%%
 data = np.genfromtxt('stylos.csv', delimiter=',', skip_header=1)
 
 #%%
@@ -290,5 +293,236 @@ for j, (ax, grid, marginal, label) in enumerate(zip(axes, grids, marginals, labe
   ax.spines[['top', 'right']].set_visible(False)
   ax.legend(frameon=False)
 
+plt.tight_layout()
+plt.show()
+
+#%%
+# Trace of each parameter, with its marginal posterior as a sideways histogram
+fig, axes = plt.subplots(3, 2, figsize=(LINEWIDTH, 7/10*LINEWIDTH),
+                         gridspec_kw=dict(width_ratios=[4, 1], wspace=0.05))
+for j, (label, grid, marginal) in enumerate(zip(labels, grids, marginals)):
+  trace_ax, hist_ax = axes[j]
+  # Traces share iterations; each histogram keeps its own density scale
+  trace_ax.sharex(axes[0, 0])
+  trace_ax.plot(x_samples[:, j], linewidth=0.6, color='#2a78d6')
+  trace_ax.axvspan(0, burn_in, color='gray', alpha=0.2, linewidth=0, label='Burn-in')
+  trace_ax.set_ylabel(label)
+  if j < 2:
+    trace_ax.tick_params(labelbottom=False)
+
+  # Sideways histogram sharing the trace's y-axis
+  hist_ax.sharey(trace_ax)
+  hist_ax.hist(x_samples[burn_in:, j], bins=40, density=True, orientation='horizontal',
+               color='#2a78d6', alpha=0.4, label='MCMC samples')
+  hist_ax.plot(marginal / trapezoid(marginal, grid), grid, color='black', linewidth=1.5,
+               label='True marginal')
+  hist_ax.tick_params(labelleft=False)
+  hist_ax.set_xticks([])
+  for ax in axes[j]:
+    ax.spines[['top', 'right']].set_visible(False)
+
+axes[-1, 0].set_xlabel('Iteration')
+axes[-1, 1].set_xlabel('Density')
+axes[0, 0].legend(frameon=False, loc='upper right')
+axes[0, 1].legend(frameon=False, loc='upper right', fontsize='small')
+fig.suptitle('Trace and marginal posterior of each parameter')
+plt.tight_layout()
+plt.show()
+
+#%%
+# Bivariate marginals: post-burn-in samples against the true highest-density contours
+pairs = [(0, 1), (0, 2), (1, 2)]
+
+fig, axes = plt.subplots(1, 3, figsize=(LINEWIDTH, 4/12*LINEWIDTH))
+for ax, (i, k) in zip(axes, pairs):
+  ax.plot(x_samples[burn_in:, i], x_samples[burn_in:, k], 'o', color='#2a78d6',
+          markersize=2, markeredgewidth=0, alpha=0.3)
+
+  # True bivariate marginal: integrate out the third parameter
+  third = 3 - i - k
+  bivariate = trapezoid(density, grids[third], axis=third)
+  levels = density_levels(bivariate, contour_masses)
+  contours = ax.contour(grids[i], grids[k], bivariate.T, levels=levels, colors='black', linewidths=1)
+  ax.clabel(contours, fmt={level: f'{mass:.0%}' for level, mass in zip(levels, contour_masses)},
+            fontsize='small')
+
+  ax.set_title(f'{labels[k]} vs {labels[i]}')
+  ax.set_xlabel(labels[i])
+  ax.set_ylabel(labels[k])
+  ax.spines[['top', 'right']].set_visible(False)
+
+# Proxy handles, since contour sets have no legend entry of their own
+fig.legend(
+  handles=[
+    plt.Line2D([], [], marker='o', linestyle='', color='#2a78d6', alpha=0.5, label='MCMC samples'),
+    plt.Line2D([], [], color='black', linewidth=1, label='True highest-density regions'),
+  ],
+  loc='upper center', ncol=2, frameon=False,
+)
+plt.tight_layout(rect=(0, 0, 1, 0.92))
+plt.show()
+
+#%%
+def predict_leave_one_out(data, i, N=5000):
+  # simulate predictive distribution
+  x_act, y_act = data[i,:]
+
+  data = np.delete(data, i, axis=0)
+  samples = sample_posterior_mh(data, size=N+burn_in)[burn_in:,:]
+
+  ln_a = samples[:,0]
+  b = samples[:,1]
+  var = samples[:,2]
+  eps = scipy.stats.norm.rvs(scale=np.sqrt(var), size=N)
+
+  ln_y_pred = ln_a + b*np.log(x_act) + eps
+  y_pred = np.exp(ln_y_pred)
+
+  ci = np.quantile(y_pred, [0.025, 0.975])
+
+  return ci, y_pred, y_act
+
+#%%
+ci, y_pred, y_act = predict_leave_one_out(data, 0)
+print(f'95% CI: {ci}')
+
+x_1, y_1 = data[0]
+fig, ax = plt.subplots()#figsize=(6, 3.5))
+ax.axvspan(*ci, color='#2a78d6', alpha=0.15, linewidth=0, label=f'95% CI [{ci[0]:.2f}, {ci[1]:.2f}]')
+ax.hist(y_pred, bins=50, density=True, color='#2a78d6', alpha=0.7, label='Predictive samples')
+ax.axvline(y_1, color='#eb6834', linewidth=2, label=f'Observed $y_1 = {y_1}$')
+ax.set_xlabel('Radius $y_1^*$ (m)')
+ax.set_ylabel('Density')
+ax.set_title(f'Leave-one-out predictive distribution at $x_1 = {x_1}$ m')
+ax.spines[['top', 'right']].set_visible(False)
+ax.legend(frameon=False)
+plt.tight_layout()
+plt.show()
+
+# plt.hist(y_pred, bins=20, density=True)
+# plt.axvline(y_act, color='red', label='Observed $y_1$')
+# plt.axvline(ci[0], color='orange')
+# plt.axvline(ci[1], color='orange')
+# plt.legend()
+
+#%%
+cis = np.array([predict_leave_one_out(data, i)[0] for i in range(24)])
+
+#%%
+# x = data[:,0]
+# plt.plot(x, cis[:,0], '--', color='tab:blue', label='Predicted 95% CI')
+# plt.plot(x, cis[:,1], '--', color='tab:blue')
+# plt.plot(x, data[:,1], 'o', label='Observed data')
+# plt.xlabel('Depth (m)')
+# plt.ylabel('Radius (m)')
+
+#%%
+var_a = (np.log(2) / 1.96)**2
+# posterior distribution
+def posterior_linear(theta, data):
+  x = data[:,0][:,np.newaxis]
+  y = data[:,1][:,np.newaxis]
+  ln_a, var = theta
+  n = data.shape[0]
+
+  # support: 0 < beta < 1 and sigma^2 > 0
+  in_support = (var > 0)
+  # placeholder variance outside the support, so the sqrt below stays valid
+  var = np.where(var > 0, var, 1.0)
+
+  pi_ln_a = np.exp(-ln_a**2 / (2*var_a))
+  pi_var = 1/var
+
+  L = np.prod(
+    np.exp(-(np.log(y) - ln_a - np.log(x))**2 / (2*var))
+      / (y * np.sqrt(2*np.pi*var)),
+    axis=0
+  )
+
+  return np.where(in_support, pi_ln_a * pi_var * L, 0.0)
+
+def sample_posterior_linear(data, proposal_params=(0.15, 0.46), size=1000,
+  init=(0, 0.5)):
+  sample = np.empty((size, 2))
+  u = scipy.stats.uniform.rvs(size=size)
+
+  # defaults to the prior means
+  sample[0,:] = init
+
+  # ln_a_step = 0.03     # sd of the Gaussian walk on ln(alpha)
+  # b_var = 0.0004       # variance of the Beta proposal for beta
+  # log_var_step = 0.46  # sd of the Gaussian walk on ln(sigma^2)
+  ln_a_step, log_var_step = proposal_params
+
+  # Density of proposing theta from given. The ln(alpha) walk is symmetric,
+  # so its term cancels in the acceptance ratio and is left out.
+  def q(theta, given):
+    return scipy.stats.lognorm.pdf(theta[1], s=log_var_step, scale=given[1])
+
+  def sample_q(t):
+    ln_a, var = sample[t,:]
+    return np.array([
+        ln_a + scipy.stats.norm.rvs(scale=ln_a_step),
+        var * np.exp(scipy.stats.norm.rvs(scale=log_var_step)),
+    ])
+
+  for t in range(size-1):
+      proposal = sample_q(t)
+      ratio = (
+          posterior_linear(proposal, data) * q(sample[t,:], proposal)
+          / (posterior_linear(sample[t,:], data) * q(proposal, sample[t,:]))
+      )
+      accept_prob = min(ratio, 1.0)
+
+      if u[t] < accept_prob:
+        sample[t+1,:] = proposal
+      else:
+        sample[t+1,:] = sample[t,:]
+
+  return sample
+
+def predict_leave_one_out_linear(data, i, N=5000):
+  # simulate predictive distribution
+  x_act, y_act = data[i,:]
+
+  data = np.delete(data, i, axis=0)
+  samples = sample_posterior_linear(data, size=N+burn_in)[burn_in:,:]
+
+  ln_a = samples[:,0]
+  var = samples[:,1]
+  eps = scipy.stats.norm.rvs(scale=np.sqrt(var), size=N)
+
+  ln_y_pred = ln_a + np.log(x_act) + eps
+  y_pred = np.exp(ln_y_pred)
+
+  ci = np.quantile(y_pred, [0.025, 0.975])
+
+  return ci, y_pred
+
+#%%
+cis_linear = np.array([predict_leave_one_out_linear(data, i)[0] for i in range(24)])
+
+#%%
+# x = data[:,0]
+# plt.plot(x, cis[:,0], '--', color='tab:blue', label='Predicted 95% CI')
+# plt.plot(x, cis[:,1], '--', color='tab:blue')
+# plt.plot(x, data[:,1], 'o', label='Observed data')
+# plt.xlabel('Depth (m)')
+# plt.ylabel('Radius (m)')
+
+x, y = data.T
+fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharey=True)
+for ax, intervals, title in zip(axes, [cis, cis_linear], ['Full model', 'Simplified model ($\\beta = 1$)']):
+  inside = (intervals[:, 0] <= y) & (y <= intervals[:, 1])
+  ax.vlines(x, intervals[:, 0], intervals[:, 1], color='#2a78d6', linewidth=3, alpha=0.5, label='95% predictive CI')
+  ax.plot(x[inside], y[inside], 'o', color='black', markersize=5, label='Observed, inside CI')
+  ax.plot(x[~inside], y[~inside], 'o', color='#eb6834', markersize=6, label='Observed, outside CI')
+  ax.set_title(f'{title}: {inside.sum()}/{len(y)} inside')
+  ax.set_xscale('log')
+  ax.set_yscale('log')
+  ax.set_xlabel('Depth $x$ (m)')
+  ax.spines[['top', 'right']].set_visible(False)
+axes[0].set_ylabel('Radius $y$ (m)')
+axes[0].legend(frameon=False, loc='upper left')
 plt.tight_layout()
 plt.show()
